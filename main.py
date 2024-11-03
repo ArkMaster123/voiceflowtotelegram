@@ -322,9 +322,22 @@ def run_bot() -> None:
         # Add error handler
         app.add_error_handler(error_handler)
 
-        # Run bot
-        logger.info("Bot is starting...")
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
+        # Get port from environment variable
+        port = int(os.getenv('PORT', '10000'))
+        
+        # Run bot with webhook
+        webhook_url = os.getenv('RENDER_EXTERNAL_URL')
+        if webhook_url:
+            logger.info(f"Starting bot with webhook on port {port}")
+            app.run_webhook(
+                listen='0.0.0.0',
+                port=port,
+                webhook_url=webhook_url,
+                allowed_updates=Update.ALL_TYPES
+            )
+        else:
+            logger.info("Starting bot in polling mode...")
+            app.run_polling(allowed_updates=Update.ALL_TYPES)
 
     except Exception as e:
         logger.critical(f"Fatal error starting bot: {str(e)}")
