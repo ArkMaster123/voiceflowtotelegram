@@ -56,7 +56,15 @@ def health_check():
 
 @app.route('/')
 def home():
-    return jsonify({"status": "running"}), 200
+    return jsonify({
+        "status": "running",
+        "version": "1.0",
+        "description": "Voiceflow Telegram Bot",
+        "endpoints": {
+            "health": "/health",
+            "root": "/"
+        }
+    }), 200
 
 if __name__ == "__main__":
     try:
