@@ -6,12 +6,21 @@ Press Ctrl-C on the command line to stop the bot.
 
 import os
 import logging
+from threading import Thread, Event
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from flask import Flask, jsonify
 
 from telegram_handler import TelegramHandler
 from config import TELEGRAM_BOT_TOKEN
 from logger import logger
+
+# Create Flask app
+app = Flask(__name__)
+
+# Create Telegram application
+application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+telegram_handler = TelegramHandler()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
@@ -26,39 +35,32 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.info(f"New user started the bot: {update.effective_user.id}")
     await update.message.reply_text(welcome_message)
 
-from flask import Flask, jsonify
+# Add handlers
+application.add_handler(CommandHandler("start", start_command))
+application.add_handler(CommandHandler("clear", telegram_handler.clear_session))
+application.add_handler(CommandHandler("stats", telegram_handler.get_analytics))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, telegram_handler.handle_message))
+application.add_handler(CallbackQueryHandler(telegram_handler.handle_callback_query))
 
-app = Flask(__name__)
+# Start bot thread
+bot_thread = Thread(target=application.run_polling, kwargs={"allowed_updates": Update.ALL_TYPES})
+bot_thread.daemon = True  # Thread will exit when main thread exits
+bot_thread.start()
+logger.info("Bot thread started")
 
 @app.route('/health')
 def health_check():
-    return jsonify({"status": "healthy"}), 200
+    if bot_thread.is_alive():
+        return jsonify({"status": "healthy", "bot": "running"}), 200
+    return jsonify({"status": "unhealthy", "bot": "stopped"}), 500
 
-def main() -> None:
-    """Start the bot and web server."""
-    # Create application
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    telegram_handler = TelegramHandler()
-
-    # Add handlers
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("clear", telegram_handler.clear_session))
-    application.add_handler(CommandHandler("stats", telegram_handler.get_analytics))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, telegram_handler.handle_message))
-    application.add_handler(CallbackQueryHandler(telegram_handler.handle_callback_query))
-
-    # Start the bot in a separate thread
-    from threading import Thread
-    bot_thread = Thread(target=application.run_polling, kwargs={"allowed_updates": Update.ALL_TYPES})
-    bot_thread.start()
-    
-    # Run Flask web server
-    logger.info("Starting bot and web server...")
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+@app.route('/')
+def home():
+    return jsonify({"status": "running"}), 200
 
 if __name__ == "__main__":
     try:
-        main()
+        port = int(os.environ.get("PORT", 10000))
+        app.run(host="0.0.0.0", port=port)
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
