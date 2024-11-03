@@ -1,27 +1,19 @@
-#!/usr/bin/env python
-"""
-Simple Telegram bot that integrates with Voiceflow.
-Press Ctrl-C on the command line to stop the bot.
-"""
-
 import os
-import logging
+import asyncio
 from datetime import datetime
-from threading import Thread, Event
+from flask import Flask, jsonify
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
-from flask import Flask, jsonify
 
 from telegram_handler import TelegramHandler
 from config import TELEGRAM_BOT_TOKEN
 from logger import logger
 
-# Create Flask app
 app = Flask(__name__)
-
-# Create Telegram application
-application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 telegram_handler = TelegramHandler()
+
+# Initialize bot application
+application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
@@ -43,56 +35,31 @@ application.add_handler(CommandHandler("stats", telegram_handler.get_analytics))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, telegram_handler.handle_message))
 application.add_handler(CallbackQueryHandler(telegram_handler.handle_callback_query))
 
-# Function to run the bot with proper async handling
-def run_bot():
-    import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(application.initialize())
-    loop.run_until_complete(application.start())
-    loop.run_forever()
-
-# Bot status tracking
-bot_started = Event()
-
-# Start bot thread
-bot_thread = Thread(target=run_bot)
-bot_thread.daemon = True  # Thread will exit when main thread exits
-bot_thread.start()
-logger.info("Bot thread started")
-
 @app.route('/health')
 def health_check():
-    try:
-        if bot_thread.is_alive() and application.bot.bot.get_me():
-            return jsonify({
-                "status": "healthy",
-                "bot": "running",
-                "timestamp": datetime.now().isoformat()
-            }), 200
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
+    """Simple health check endpoint"""
     return jsonify({
-        "status": "unhealthy",
-        "bot": "stopped",
+        "status": "healthy",
         "timestamp": datetime.now().isoformat()
-    }), 500
+    }), 200
 
 @app.route('/')
 def home():
     return jsonify({
         "status": "running",
         "version": "1.0",
-        "description": "Voiceflow Telegram Bot",
-        "endpoints": {
-            "health": "/health",
-            "root": "/"
-        }
+        "description": "Voiceflow Telegram Bot"
     }), 200
 
+def main():
+    # Initialize the bot
+    asyncio.run(application.initialize())
+    asyncio.run(application.start())
+    logger.info("Bot initialized and started")
+    
+    # Start Flask server
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
 if __name__ == "__main__":
-    try:
-        port = int(os.environ.get("PORT", 10000))
-        app.run(host="0.0.0.0", port=port)
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+    main()
