@@ -33,13 +33,19 @@ def health_check():
 
 def run_bot():
     """Run the bot in the background"""
-    asyncio.run(application.run_polling())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(application.initialize())
+    loop.run_until_complete(application.start())
+    loop.run_until_complete(application.updater.start_polling())
+    loop.run_forever()
 
 if __name__ == "__main__":
     # Start the bot in a separate thread
     bot_thread = Thread(target=run_bot)
     bot_thread.daemon = True
     bot_thread.start()
+    logger.info("Bot thread started")
     
     # Start Flask server
     port = int(os.environ.get("PORT", 10000))
