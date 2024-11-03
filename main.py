@@ -25,8 +25,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.info(f"New user started the bot: {update.effective_user.id}")
     await update.message.reply_text(welcome_message)
 
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
 def main() -> None:
-    """Start the bot."""
+    """Start the bot and web server."""
     # Create application
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     telegram_handler = TelegramHandler()
@@ -38,9 +46,15 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, telegram_handler.handle_message))
     application.add_handler(CallbackQueryHandler(telegram_handler.handle_callback_query))
 
-    # Run the bot until the user presses Ctrl-C
-    logger.info("Starting bot...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Start the bot in a separate thread
+    from threading import Thread
+    bot_thread = Thread(target=application.run_polling, kwargs={"allowed_updates": Update.ALL_TYPES})
+    bot_thread.start()
+    
+    # Run Flask web server
+    logger.info("Starting bot and web server...")
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
     try:
