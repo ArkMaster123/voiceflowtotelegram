@@ -51,6 +51,9 @@ def run_bot():
     loop.run_until_complete(application.start())
     loop.run_forever()
 
+# Bot status tracking
+bot_started = Event()
+
 # Start bot thread
 bot_thread = Thread(target=run_bot)
 bot_thread.daemon = True  # Thread will exit when main thread exits
@@ -59,9 +62,20 @@ logger.info("Bot thread started")
 
 @app.route('/health')
 def health_check():
-    if bot_thread.is_alive():
-        return jsonify({"status": "healthy", "bot": "running"}), 200
-    return jsonify({"status": "unhealthy", "bot": "stopped"}), 500
+    try:
+        if bot_thread.is_alive() and application.bot.bot.get_me():
+            return jsonify({
+                "status": "healthy",
+                "bot": "running",
+                "timestamp": datetime.now().isoformat()
+            }), 200
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+    return jsonify({
+        "status": "unhealthy",
+        "bot": "stopped",
+        "timestamp": datetime.now().isoformat()
+    }), 500
 
 @app.route('/')
 def home():
