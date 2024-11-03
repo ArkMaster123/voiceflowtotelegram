@@ -1,6 +1,7 @@
 import os
 import asyncio
 from datetime import datetime
+from threading import Thread
 from flask import Flask, jsonify
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
@@ -15,17 +16,8 @@ telegram_handler = TelegramHandler()
 # Initialize bot application
 application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /start is issued."""
-    welcome_message = (
-        "👋 Welcome! I'm your Voiceflow-powered assistant. "
-        "You can start chatting with me right away!\n\n"
-        "Available commands:\n"
-        "/start - Start the conversation\n"
-        "/clear - Clear your session\n"
-        "/stats - View your chat statistics"
-    )
-    logger.info(f"New user started the bot: {update.effective_user.id}")
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    welcome_message = "👋 Welcome! I'm your Voiceflow-powered assistant.\n/start - Start\n/clear - Reset\n/stats - Statistics"
     await update.message.reply_text(welcome_message)
 
 # Add handlers
@@ -37,29 +29,18 @@ application.add_handler(CallbackQueryHandler(telegram_handler.handle_callback_qu
 
 @app.route('/health')
 def health_check():
-    """Simple health check endpoint"""
-    return jsonify({
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
-    }), 200
+    return jsonify({"status": "healthy"}), 200
 
-@app.route('/')
-def home():
-    return jsonify({
-        "status": "running",
-        "version": "1.0",
-        "description": "Voiceflow Telegram Bot"
-    }), 200
+def run_bot():
+    """Run the bot in the background"""
+    asyncio.run(application.run_polling())
 
-def main():
-    # Initialize the bot
-    asyncio.run(application.initialize())
-    asyncio.run(application.start())
-    logger.info("Bot initialized and started")
+if __name__ == "__main__":
+    # Start the bot in a separate thread
+    bot_thread = Thread(target=run_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
     
     # Start Flask server
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-
-if __name__ == "__main__":
-    main()
