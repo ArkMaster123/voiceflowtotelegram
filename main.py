@@ -42,8 +42,17 @@ application.add_handler(CommandHandler("stats", telegram_handler.get_analytics))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, telegram_handler.handle_message))
 application.add_handler(CallbackQueryHandler(telegram_handler.handle_callback_query))
 
+# Function to run the bot with proper async handling
+def run_bot():
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(application.initialize())
+    loop.run_until_complete(application.start())
+    loop.run_forever()
+
 # Start bot thread
-bot_thread = Thread(target=application.run_polling, kwargs={"allowed_updates": Update.ALL_TYPES})
+bot_thread = Thread(target=run_bot)
 bot_thread.daemon = True  # Thread will exit when main thread exits
 bot_thread.start()
 logger.info("Bot thread started")
