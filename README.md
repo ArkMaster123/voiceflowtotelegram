@@ -114,9 +114,8 @@ MIT - Go wild! 🎉
 If this bot makes you smile, give us a star! ⭐
 
 ## 🆘 Need Help?
-- 📚 Check our [Wiki](wiki)
-- 💬 Join our [Community](community)
-- 🐛 Found a bug? [Report it](issues)
+
+- 🐛 Found a bug? [Report it]
 
 ---
 Made with ❤️ by developers for developers
